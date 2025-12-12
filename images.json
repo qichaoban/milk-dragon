@@ -1,0 +1,106 @@
+{
+  "photos": [
+    {
+      "path": "./images/1.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/2.jpg", 
+      "title": "圣诞树",
+      "description": "装饰精美的圣诞树"
+    },
+    {
+      "path": "./images/3.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/4.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/5.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/6.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/7.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/8.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/9.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/10.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/11.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/12.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/13.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/14.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/15.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    },
+    {
+      "path": "./images/16.jpg",
+      "title": "圣诞装饰",
+      "description": "金色圣诞装饰球"
+    }
+
+  ],
+  "config": {
+    "loadTimeout": 8000,
+    "retryAttempts": 3,
+    "supportedFormats": ["jpg", "jpeg", "png", "webp", "gif"],
+    "maxFileSize": "2MB",
+    "fallbackImage": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2FhYSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWbvueJh+acquWKoOi9veWksei0pTwvdGV4dD48L3N2Zz4="
+  },
+  "instructions": {
+    "setup": [
+      "1. 将你的照片复制到 ./images/ 文件夹中",
+      "2. 修改上面的 photos 数组，将 path 改为你的实际文件路径",
+      "3. 可以创建子文件夹来组织照片，如 ./images/family/, ./images/travel/ 等",
+      "4. 保存文件后刷新页面即可看到你的照片"
+    ],
+    "pathExamples": [
+      "./images/my-photo.jpg",
+      "./images/family/christmas.png", 
+      "./images/travel/vacation2023.jpg",
+      "./images/pets/cat.webp"
+    ]
+  }
+}

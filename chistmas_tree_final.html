@@ -73,27 +73,7 @@
             gap: 10px;
         }
 
-        .upload-btn {
-            background: rgba(20, 20, 20, 0.6); 
-            border: 1px solid rgba(212, 175, 55, 0.4); 
-            color: #d4af37; 
-            padding: 10px 20px; 
-            cursor: pointer; 
-            text-transform: uppercase; 
-            letter-spacing: 2px; 
-            font-size: 10px;
-            transition: all 0.4s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(5px);
-            min-width: 120px;
-        }
-        .upload-btn:hover { 
-            background: #d4af37; 
-            color: #000; 
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
-        }
+        /* Upload buttons removed - using configuration-based photo loading */
         
         .hint-text {
             color: rgba(212, 175, 55, 0.5);
@@ -172,19 +152,8 @@
         <h1>Merry Christmas</h1>
         
         <div class="controls-wrapper">
-            <div class="btn-group">
-                <label class="upload-btn">
-                    Select Folder
-                    <input type="file" id="folder-input" webkitdirectory directory multiple>
-                </label>
-                
-                <label class="upload-btn">
-                    Select Files
-                    <input type="file" id="file-input" multiple accept="image/*">
-                </label>
-            </div>
-            <div class="hint-text">Use "Select Folder" to load all photos at once</div>
-            <div class="hint-text" style="opacity: 0.7; font-size: 8px;">Or put photos in "./images/" (1.jpg - 30.jpg)</div>
+            <div class="hint-text">Photos loaded from configuration</div>
+            <div class="hint-text" style="opacity: 0.7; font-size: 8px;">Managed via images.json</div>
         </div>
     </div>
 
@@ -220,14 +189,9 @@
             camera: { z: 50 },
             
             preload: {
-                autoScanLocal: true,
-                scanCount: 200, 
-                images: [
-                    'https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=600', 
-                    'https://images.unsplash.com/photo-1576919228236-a097c32a5cd4?q=80&w=600',
-                    'https://images.unsplash.com/photo-1512389142860-9c449e58a543?q=80&w=600', 
-                    'https://images.unsplash.com/photo-1482638588057-dce9509db949?q=80&w=600'
-                ]
+                configFile: './images.json', // 照片配置文件路径
+                loadTimeout: 5000,           // 加载超时时间
+                retryAttempts: 2             // 重试次数
             }
         };
 
@@ -249,52 +213,122 @@
         const debugInfo = document.getElementById('debug-info');
 
         async function init() {
+            // 先隐藏加载界面，让用户看到基础场景
+            const loader = document.getElementById('loader');
+            
+            // 快速初始化核心组件
             initThree();
             setupEnvironment(); 
             setupLights();
             createTextures();
             createParticles(); 
             createDust();     
-            loadPredefinedImages();
             setupPostProcessing();
             setupEvents();
-            await initMediaPipe();
             
-            const loader = document.getElementById('loader');
+            // 隐藏加载界面
             loader.style.opacity = 0;
-            setTimeout(() => loader.remove(), 800);
-
+            setTimeout(() => loader.remove(), 300);
+            
+            // 开始动画循环
             animate();
+            
+            // 异步加载较重的组件
+            setTimeout(async () => {
+                loadPredefinedImages(); // 延迟加载图片
+                await initMediaPipe();  // 延迟初始化摄像头
+            }, 100);
         }
 
-        // --- 增强版图片加载系统 ---
-        function loadPredefinedImages() {
+        // --- 配置文件驱动的图片加载系统 ---
+        async function loadPredefinedImages() {
+            try {
+                console.log('Loading images from configuration...');
+                
+                // 从配置文件加载图片列表
+                const response = await fetch(CONFIG.preload.configFile);
+                if (!response.ok) {
+                    throw new Error(`Failed to load config: ${response.status}`);
+                }
+                
+                const config = await response.json();
+                const photos = config.photos || [];
+                
+                console.log(`Found ${photos.length} photos in configuration`);
+                
+                // 使用Three.js纹理加载器
+                const loader = new THREE.TextureLoader();
+                
+                // 逐个加载图片，避免并发过多
+                let loadedCount = 0;
+                let failedCount = 0;
+                
+                for (const photo of photos) {
+                    try {
+                        await new Promise((resolve, reject) => {
+                            const timeout = setTimeout(() => {
+                                reject(new Error('Load timeout'));
+                            }, CONFIG.preload.loadTimeout);
+                            
+                            // 支持 url 和 path 两种格式
+                            const imagePath = photo.url || photo.path;
+                            
+                            loader.load(
+                                imagePath,
+                                (texture) => {
+                                    clearTimeout(timeout);
+                                    texture.colorSpace = THREE.SRGBColorSpace;
+                                    addPhotoToScene(texture, photo.title, photo.description);
+                                    loadedCount++;
+                                    console.log(`✓ Loaded: ${photo.title || imagePath}`);
+                                    resolve();
+                                },
+                                undefined,
+                                (error) => {
+                                    clearTimeout(timeout);
+                                    reject(error);
+                                }
+                            );
+                        });
+                        
+                        // 添加小延迟避免请求过于密集
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                    } catch (error) {
+                        failedCount++;
+                        const imagePath = photo.url || photo.path;
+                        console.warn(`✗ Failed to load: ${photo.title || imagePath}`, error.message);
+                    }
+                }
+                
+                console.log(`Image loading complete: ${loadedCount} loaded, ${failedCount} failed`);
+                
+            } catch (error) {
+                console.error('Failed to load image configuration:', error);
+                // 如果配置文件加载失败，可以加载一些默认图片
+                console.log('Falling back to default images...');
+                loadFallbackImages();
+            }
+        }
+        
+        // 备用图片加载函数
+        function loadFallbackImages() {
+            const fallbackUrls = [
+                'https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=400',
+                'https://images.unsplash.com/photo-1576919228236-a097c32a5cd4?q=80&w=400'
+            ];
+            
             const loader = new THREE.TextureLoader();
-            CONFIG.preload.images.forEach(url => {
+            fallbackUrls.forEach(url => {
                 loader.load(url, 
-                    (t) => { t.colorSpace = THREE.SRGBColorSpace; addPhotoToScene(t); },
+                    (t) => { 
+                        t.colorSpace = THREE.SRGBColorSpace; 
+                        addPhotoToScene(t, 'Fallback Image'); 
+                    },
                     undefined,
-                    (e) => { console.log(`Skipped: ${url}`); }
+                    (e) => console.log(`Fallback image failed: ${url}`)
                 );
             });
-
-            if (CONFIG.preload.autoScanLocal) {
-                for (let i = 1; i <= CONFIG.preload.scanCount; i++) {
-                    const pathJpg = `./images/(${i}).jpg`;
-                    const pathPng = `./images/(${i}).png`;
-                    loader.load(pathJpg, 
-                        (t) => { t.colorSpace = THREE.SRGBColorSpace; addPhotoToScene(t); },
-                        undefined,
-                        () => {
-                             loader.load(pathPng, 
-                                (t) => { t.colorSpace = THREE.SRGBColorSpace; addPhotoToScene(t); },
-                                undefined,
-                                () => {} 
-                             );
-                        }
-                    );
-                }
-            }
         }
 
         function initThree() {
@@ -618,7 +652,7 @@
             }
         }
 
-        function addPhotoToScene(texture) {
+        function addPhotoToScene(texture, title = '', description = '') {
             const frameGeo = new THREE.BoxGeometry(1.4, 1.4, 0.05);
             const frameMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.champagneGold, metalness: 1.0, roughness: 0.1 });
             const frame = new THREE.Mesh(frameGeo, frameMat);
@@ -655,22 +689,7 @@
             updatePhotoLayout();
         }
         
-        function handleImageUpload(e) {
-            const files = e.target.files;
-            if(!files.length) return;
-            
-            Array.from(files).forEach(f => {
-                if (!f.type.startsWith('image/')) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    new THREE.TextureLoader().load(ev.target.result, (t) => {
-                        t.colorSpace = THREE.SRGBColorSpace;
-                        addPhotoToScene(t);
-                    });
-                }
-                reader.readAsDataURL(f);
-            });
-        }
+        // 文件上传功能已移除，改为配置文件驱动的照片加载
 
         // --- MEDIAPIPE (Adaptive Fix) ---
         async function initMediaPipe() {
@@ -788,8 +807,7 @@
                 composer.setSize(window.innerWidth, window.innerHeight);
             });
             
-            document.getElementById('file-input').addEventListener('change', handleImageUpload);
-            document.getElementById('folder-input').addEventListener('change', handleImageUpload);
+            // 文件上传功能已移除，改为配置文件驱动
             
             window.addEventListener('keydown', (e) => {
                 if (e.key.toLowerCase() === 'h') {
