@@ -1,0 +1,47 @@
+{
+  "music": [
+    {
+      "path": "./music/jingle-bells.mp3",
+      "title": "Jingle Bells",
+      "description": "经典圣诞铃声 - 铃儿响叮当",
+      "volume": 0.5,
+      "loop": true
+    },
+    {
+      "path": "./music/sample-bell.wav",
+      "title": "Christmas Bell",
+      "description": "圣诞铃声示例",
+      "volume": 0.4,
+      "loop": true
+    }
+ 
+  ],
+  "config": {
+    "autoPlay": true,
+    "defaultVolume": 0.5,
+    "fadeInDuration": 2000,
+    "fadeOutDuration": 1000,
+    "supportedFormats": ["mp3", "wav", "ogg", "m4a"],
+    "maxFileSize": "10MB",
+    "crossfade": true
+  },
+  "instructions": {
+    "setup": [
+      "1. 将你的音乐文件复制到 ./music/ 文件夹中",
+      "2. 修改上面的 music 数组，将 path 改为你的实际文件路径",
+      "3. 可以设置音量 (0.0-1.0) 和是否循环播放",
+      "4. 保存文件后刷新页面即可听到背景音乐"
+    ],
+    "pathExamples": [
+      "./music/christmas-song.mp3",
+      "./music/ambient/winter-sounds.wav",
+      "./music/classical/christmas-symphony.m4a"
+    ],
+    "tips": [
+      "建议使用循环播放 (loop: true) 作为背景音乐",
+      "音量建议设置在 0.3-0.7 之间，避免过于突兀",
+      "支持多首歌曲，会随机或按顺序播放",
+      "可以设置 autoPlay: true 自动播放（需要用户交互后才能生效）"
+    ]
+  }
+}

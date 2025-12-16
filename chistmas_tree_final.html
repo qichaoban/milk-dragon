@@ -123,6 +123,86 @@
             padding: 2px 5px;
             pointer-events: none;
         }
+
+        /* Music Controls */
+        #music-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: auto;
+            z-index: 20;
+        }
+
+        .music-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(212, 175, 55, 0.1);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: #d4af37;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .music-button:hover {
+            background: rgba(212, 175, 55, 0.2);
+            border-color: rgba(212, 175, 55, 0.6);
+            transform: scale(1.1);
+        }
+
+        .music-button.active {
+            background: rgba(212, 175, 55, 0.3);
+            border-color: #d4af37;
+        }
+
+        #volume-control {
+            width: 100px;
+            height: 4px;
+            background: rgba(212, 175, 55, 0.2);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        #volume-control::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #d4af37;
+            cursor: pointer;
+        }
+
+        #volume-control::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #d4af37;
+            cursor: pointer;
+            border: none;
+        }
+
+        .music-info {
+            color: rgba(212, 175, 55, 0.8);
+            font-size: 10px;
+            text-align: center;
+            max-width: 120px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
     
     <style>
@@ -163,6 +243,18 @@
         <canvas id="webcam-preview" style="display:none;"></canvas>
     </div>
 
+    <!-- Music Controls -->
+    <div id="music-controls">
+        <button id="play-pause-btn" class="music-button" title="播放/暂停">
+            ▶️
+        </button>
+        <input type="range" id="volume-control" min="0" max="1" step="0.1" value="0.5" title="音量控制">
+        <div id="music-info" class="music-info">Loading music...</div>
+    </div>
+
+    <!-- Hidden Audio Element -->
+    <audio id="background-music" loop preload="auto"></audio>
+
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -192,6 +284,14 @@
                 configFile: './images.json', // 照片配置文件路径
                 loadTimeout: 5000,           // 加载超时时间
                 retryAttempts: 2             // 重试次数
+            },
+            
+            music: {
+                configFile: './music.json',  // 音乐配置文件路径
+                loadTimeout: 8000,           // 音乐加载超时时间
+                retryAttempts: 2,            // 重试次数
+                autoPlay: false,             // 是否自动播放
+                defaultVolume: 0.5           // 默认音量
             }
         };
 
@@ -211,6 +311,15 @@
         let handLandmarker, video;
         let caneTexture; 
         const debugInfo = document.getElementById('debug-info');
+        
+        // Music variables
+        let musicConfig = null;
+        let currentMusicIndex = 0;
+        let isPlaying = false;
+        const audioElement = document.getElementById('background-music');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const volumeControl = document.getElementById('volume-control');
+        const musicInfo = document.getElementById('music-info');
 
         async function init() {
             // 先隐藏加载界面，让用户看到基础场景
@@ -236,8 +345,12 @@
             // 异步加载较重的组件
             setTimeout(async () => {
                 loadPredefinedImages(); // 延迟加载图片
+                loadBackgroundMusic();  // 延迟加载音乐
                 await initMediaPipe();  // 延迟初始化摄像头
             }, 100);
+            
+            // 添加用户交互监听器以启用自动播放
+            addUserInteractionListener();
         }
 
         // --- 配置文件驱动的图片加载系统 ---
@@ -329,6 +442,227 @@
                     (e) => console.log(`Fallback image failed: ${url}`)
                 );
             });
+        }
+
+        // --- MUSIC SYSTEM ---
+        async function loadBackgroundMusic() {
+            try {
+                console.log('Loading music configuration...');
+                const response = await fetch(CONFIG.music.configFile);
+                if (!response.ok) {
+                    throw new Error(`Failed to load music config: ${response.status}`);
+                }
+                
+                musicConfig = await response.json();
+                console.log('Music config loaded:', musicConfig);
+                const musicList = musicConfig.music || [];
+                
+                if (musicList.length === 0) {
+                    console.log('No music configured');
+                    musicInfo.textContent = 'No music configured';
+                    return;
+                }
+                
+                console.log(`Found ${musicList.length} music tracks`);
+                console.log('AutoPlay setting:', musicConfig.config?.autoPlay);
+                
+                // 设置第一首歌曲
+                currentMusicIndex = 0;
+                loadCurrentTrack();
+                
+                // 设置音乐控制事件
+                setupMusicControls();
+                
+            } catch (error) {
+                console.error('Failed to load music configuration:', error);
+                musicInfo.textContent = 'Music load failed';
+            }
+        }
+        
+        function loadCurrentTrack() {
+            if (!musicConfig || !musicConfig.music || musicConfig.music.length === 0) {
+                return;
+            }
+            
+            const track = musicConfig.music[currentMusicIndex];
+            const musicPath = track.url || track.path;
+            
+            console.log(`Loading track: ${track.title || musicPath}`);
+            
+            audioElement.src = musicPath;
+            audioElement.volume = track.volume || CONFIG.music.defaultVolume;
+            audioElement.loop = track.loop !== false; // 默认循环
+            
+            // 更新音量控制器
+            volumeControl.value = audioElement.volume;
+            
+            // 更新音乐信息显示
+            musicInfo.textContent = track.title || 'Unknown Track';
+            
+            // 监听加载事件
+            audioElement.addEventListener('loadeddata', () => {
+                console.log(`✓ Music loaded: ${track.title || musicPath}`);
+            });
+            
+            audioElement.addEventListener('error', (e) => {
+                console.warn(`✗ Failed to load music: ${track.title || musicPath}`, e);
+                console.warn('Audio error details:', e.target.error);
+                musicInfo.textContent = 'Load failed - check file format';
+            });
+            
+            audioElement.addEventListener('canplaythrough', () => {
+                console.log(`✓ Music ready to play: ${track.title || musicPath}`);
+                console.log('AutoPlay config:', musicConfig.config?.autoPlay);
+                console.log('Current playing state:', isPlaying);
+                musicInfo.textContent = track.title || 'Ready to play';
+                
+                // 如果配置了自动播放，则自动开始播放
+                if (musicConfig.config && musicConfig.config.autoPlay && !isPlaying) {
+                    console.log('Attempting auto-play...');
+                    setTimeout(() => {
+                        autoStartMusic();
+                    }, 500); // 延迟500ms确保音频完全准备好
+                }
+            });
+        }
+        
+        function setupMusicControls() {
+            // 播放/暂停按钮
+            playPauseBtn.addEventListener('click', togglePlayPause);
+            
+            // 音量控制
+            volumeControl.addEventListener('input', (e) => {
+                audioElement.volume = parseFloat(e.target.value);
+            });
+            
+            // 音乐结束时切换到下一首（如果不是循环模式）
+            audioElement.addEventListener('ended', () => {
+                if (!audioElement.loop && musicConfig.music.length > 1) {
+                    nextTrack();
+                }
+            });
+            
+            // 双击音乐控制区域切换歌曲
+            document.getElementById('music-controls').addEventListener('dblclick', nextTrack);
+        }
+        
+        function togglePlayPause() {
+            if (!audioElement.src) {
+                console.log('No music loaded');
+                musicInfo.textContent = 'No music loaded';
+                return;
+            }
+            
+            if (isPlaying) {
+                audioElement.pause();
+                playPauseBtn.textContent = '▶️';
+                playPauseBtn.classList.remove('active');
+                isPlaying = false;
+                console.log('Music paused');
+            } else {
+                // 检查音频是否可以播放
+                if (audioElement.readyState >= 2) { // HAVE_CURRENT_DATA
+                    audioElement.play().then(() => {
+                        playPauseBtn.textContent = '⏸️';
+                        playPauseBtn.classList.add('active');
+                        isPlaying = true;
+                        console.log('Music playing');
+                    }).catch((error) => {
+                        console.warn('Failed to play music:', error);
+                        console.warn('Error type:', error.name);
+                        console.warn('Error message:', error.message);
+                        
+                        if (error.name === 'NotSupportedError') {
+                            musicInfo.textContent = 'Unsupported audio format';
+                        } else if (error.name === 'NotAllowedError') {
+                            musicInfo.textContent = 'Click to enable audio';
+                        } else {
+                            musicInfo.textContent = 'Play failed - check console';
+                        }
+                    });
+                } else {
+                    console.log('Audio not ready, waiting...');
+                    musicInfo.textContent = 'Loading audio...';
+                    
+                    // 等待音频加载完成
+                    audioElement.addEventListener('canplaythrough', function onCanPlay() {
+                        audioElement.removeEventListener('canplaythrough', onCanPlay);
+                        togglePlayPause(); // 递归调用
+                    });
+                }
+            }
+        }
+        
+        function autoStartMusic() {
+            console.log('autoStartMusic called');
+            console.log('Audio element src:', audioElement.src);
+            console.log('Audio readyState:', audioElement.readyState);
+            console.log('Audio paused:', audioElement.paused);
+            
+            // 自动播放音乐（需要处理浏览器的自动播放策略）
+            audioElement.play().then(() => {
+                playPauseBtn.textContent = '⏸️';
+                playPauseBtn.classList.add('active');
+                isPlaying = true;
+                console.log('✅ Music auto-started successfully');
+                musicInfo.textContent = musicConfig.music[currentMusicIndex].title || 'Playing';
+            }).catch((error) => {
+                console.warn('❌ Auto-play blocked by browser:', error.name, error.message);
+                // 浏览器阻止了自动播放，显示提示让用户手动点击
+                musicInfo.textContent = 'Click ▶️ to play music';
+                playPauseBtn.textContent = '▶️';
+                playPauseBtn.classList.remove('active');
+                isPlaying = false;
+                
+                // 尝试在用户交互后自动播放
+                enableAutoPlayOnInteraction();
+            });
+        }
+        
+        function enableAutoPlayOnInteraction() {
+            console.log('Setting up auto-play on user interaction...');
+            let hasTriggered = false;
+            
+            function tryAutoPlay() {
+                if (hasTriggered) return;
+                hasTriggered = true;
+                
+                console.log('User interaction detected, trying auto-play again...');
+                if (audioElement.src && !isPlaying) {
+                    autoStartMusic();
+                }
+                
+                // 清理监听器
+                document.removeEventListener('click', tryAutoPlay);
+                document.removeEventListener('keydown', tryAutoPlay);
+                document.removeEventListener('touchstart', tryAutoPlay);
+            }
+            
+            document.addEventListener('click', tryAutoPlay);
+            document.addEventListener('keydown', tryAutoPlay);
+            document.addEventListener('touchstart', tryAutoPlay);
+        }
+        
+        function nextTrack() {
+            if (!musicConfig || !musicConfig.music || musicConfig.music.length <= 1) {
+                return;
+            }
+            
+            currentMusicIndex = (currentMusicIndex + 1) % musicConfig.music.length;
+            const wasPlaying = isPlaying;
+            
+            if (isPlaying) {
+                audioElement.pause();
+                isPlaying = false;
+            }
+            
+            loadCurrentTrack();
+            
+            if (wasPlaying) {
+                setTimeout(() => {
+                    togglePlayPause();
+                }, 100);
+            }
         }
 
         function initThree() {
@@ -807,16 +1141,64 @@
                 composer.setSize(window.innerWidth, window.innerHeight);
             });
             
-            // 文件上传功能已移除，改为配置文件驱动
-            
-            window.addEventListener('keydown', (e) => {
-                if (e.key.toLowerCase() === 'h') {
-                    const controls = document.querySelector('.controls-wrapper');
-                    if (controls) controls.classList.toggle('ui-hidden');
-                    const webcam = document.getElementById('webcam-wrapper');
-                    if(webcam) webcam.classList.toggle('ui-hidden');
+            // 键盘事件
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'h' || e.key === 'H') {
+                    const uiLayer = document.getElementById('ui-layer');
+                    const musicControls = document.getElementById('music-controls');
+                    uiLayer.classList.toggle('ui-hidden');
+                    musicControls.style.display = musicControls.style.display === 'none' ? 'flex' : 'none';
+                }
+                
+                // 空格键播放/暂停音乐
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    togglePlayPause();
+                }
+                
+                // 方向键切换歌曲
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    nextTrack();
                 }
             });
+        }
+        
+        function addUserInteractionListener() {
+            console.log('Adding user interaction listener for auto-play...');
+            // 添加一次性用户交互监听器，用于启用自动播放
+            let hasInteracted = false;
+            
+            function handleFirstInteraction(e) {
+                if (hasInteracted) return;
+                hasInteracted = true;
+                
+                console.log('🎯 First user interaction detected:', e.type);
+                console.log('Music config available:', !!musicConfig);
+                console.log('AutoPlay enabled:', musicConfig?.config?.autoPlay);
+                console.log('Audio src:', audioElement.src);
+                console.log('Is playing:', isPlaying);
+                console.log('Audio ready state:', audioElement.readyState);
+                
+                // 如果音乐已加载且配置了自动播放，则开始播放
+                if (musicConfig && musicConfig.config && musicConfig.config.autoPlay && 
+                    audioElement.src && !isPlaying) {
+                    console.log('🎵 Triggering auto-play on user interaction...');
+                    setTimeout(() => {
+                        autoStartMusic();
+                    }, 100);
+                }
+                
+                // 移除监听器
+                document.removeEventListener('click', handleFirstInteraction);
+                document.removeEventListener('keydown', handleFirstInteraction);
+                document.removeEventListener('touchstart', handleFirstInteraction);
+            }
+            
+            // 监听各种用户交互
+            document.addEventListener('click', handleFirstInteraction);
+            document.addEventListener('keydown', handleFirstInteraction);
+            document.addEventListener('touchstart', handleFirstInteraction);
         }
 
         function animate() {
