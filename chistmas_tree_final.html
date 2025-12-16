@@ -594,20 +594,13 @@
         }
         
         function autoStartMusic() {
-            console.log('autoStartMusic called');
-            console.log('Audio element src:', audioElement.src);
-            console.log('Audio readyState:', audioElement.readyState);
-            console.log('Audio paused:', audioElement.paused);
-            
             // 自动播放音乐（需要处理浏览器的自动播放策略）
             audioElement.play().then(() => {
                 playPauseBtn.textContent = '⏸️';
                 playPauseBtn.classList.add('active');
                 isPlaying = true;
-                console.log('✅ Music auto-started successfully');
                 musicInfo.textContent = musicConfig.music[currentMusicIndex].title || 'Playing';
             }).catch((error) => {
-                console.warn('❌ Auto-play blocked by browser:', error.name, error.message);
                 // 浏览器阻止了自动播放，显示提示让用户手动点击
                 musicInfo.textContent = 'Click ▶️ to play music';
                 playPauseBtn.textContent = '▶️';
@@ -620,14 +613,12 @@
         }
         
         function enableAutoPlayOnInteraction() {
-            console.log('Setting up auto-play on user interaction...');
             let hasTriggered = false;
             
             function tryAutoPlay() {
                 if (hasTriggered) return;
                 hasTriggered = true;
                 
-                console.log('User interaction detected, trying auto-play again...');
                 if (audioElement.src && !isPlaying) {
                     autoStartMusic();
                 }
@@ -1057,7 +1048,6 @@
                     video.addEventListener("loadeddata", predictWebcam);
                     debugInfo.innerText = "Webcam active. Show hand.";
                 } catch(e) {
-                    console.warn("Webcam access denied or not available", e);
                     debugInfo.innerText = "Camera error: " + e.message;
                     document.getElementById('webcam-wrapper').style.display = 'none';
                 }
@@ -1165,7 +1155,6 @@
         }
         
         function addUserInteractionListener() {
-            console.log('Adding user interaction listener for auto-play...');
             // 添加一次性用户交互监听器，用于启用自动播放
             let hasInteracted = false;
             
@@ -1173,17 +1162,9 @@
                 if (hasInteracted) return;
                 hasInteracted = true;
                 
-                console.log('🎯 First user interaction detected:', e.type);
-                console.log('Music config available:', !!musicConfig);
-                console.log('AutoPlay enabled:', musicConfig?.config?.autoPlay);
-                console.log('Audio src:', audioElement.src);
-                console.log('Is playing:', isPlaying);
-                console.log('Audio ready state:', audioElement.readyState);
-                
                 // 如果音乐已加载且配置了自动播放，则开始播放
                 if (musicConfig && musicConfig.config && musicConfig.config.autoPlay && 
                     audioElement.src && !isPlaying) {
-                    console.log('🎵 Triggering auto-play on user interaction...');
                     setTimeout(() => {
                         autoStartMusic();
                     }, 100);
